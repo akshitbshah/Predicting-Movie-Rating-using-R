@@ -1,0 +1,131 @@
+```{r}
+require(tidyverse)
+```
+
+```{r}
+library(readr)
+movies <- read_csv("movies.csv")
+#View(movies)
+
+library(readr)
+ratings <- read_csv("ratings.csv")
+#View(ratings)
+
+library(readr)
+tags <- read_csv("tags.csv")
+#View(tags)
+
+```
+
+```{r}
+merged_df=merge(movies,ratings,on="movieId")
+#merged_df=merge(merged_df,tags, on="movieId")
+head(merged_df)
+
+
+```
+
+```{r}
+head(merged_df)
+```
+
+```{r}
+clean <- merged_df %>%
+  extract(title, c("titleDummy", "year"), regex = "^(.*)\\(([0-9 \\-]*)\\)$",remove=F) %>% 
+  #colSums(is.na(moviesDF)) %>%
+  mutate(title = if_else(is.na(titleDummy), title, titleDummy)) %>%
+  dplyr::select(-titleDummy)  %>%
+  mutate(genres = if_else(genres == "(no genres listed)", `is.na<-`(genres), genres)) %>%
+  mutate(title = str_trim(title))
+```
+
+```{r}
+head(clean)
+```
+
+```{r}
+clean=clean[complete.cases(clean), ]
+```
+
+```{r}
+clean=separate_rows(clean, genres, sep = "\\|")
+head(clean)
+```
+
+```{r}
+str(clean)
+```
+## Predictive Work
+```{r}
+write.csv(clean, file = "Final_data.csv")
+```
+
+```{r}
+## removing the last row from the dataset
+final_data <- head(clean, -1)
+tail(final_data)
+
+```
+```{r}
+library('ggplot2')
+#install.packages('forecast')
+library('forecast')
+library('tseries')
+```
+
+```{r}
+Final_Data = read.csv('final_data.csv', header=TRUE, stringsAsFactors=FALSE)
+```
+
+
+```{r}
+## Separating year and summarizing them by average ratings
+library(dplyr)
+Year_by_ratings<- Final_Data %>%
+  group_by(year) %>%
+  summarise(Avg_Rating = mean(rating))
+
+```
+
+```{r}
+## exporting time series dataframe
+write.csv(Year_by_ratings, file = "year_data.csv")
+```
+
+
+```{r}
+## Checking the head and tail of the datasets
+tail(Year_by_ratings)
+head(Year_by_ratings)
+#install.packages('fpp')
+library(fpp)
+movieRatings <- ts(Year_by_ratings$Avg_Rating,start = c(1995,1),end=c(2018,1),frequency = 12)
+plot(movieRatings) ## timeseries command to plot the graph
+Acf(movieRatings) ## Used to identify Trend and Seasonality
+adf.test(movieRatings)## This is a test to identify whether our graph is stationary or not
+nsdiffs(movieRatings)## p value states that this is statinary (p value<0.05)
+ndiffs(movieRatings)
+
+## Making ARIMA model
+movieRatings_arimaFit <- auto.arima(movieRatings,stepwise = FALSE,approximation = FALSE)
+accuracy(movieRatings_arimaFit) ##rootmeansquare error should be as less as possible
+arima_forecast <- forecast(movieRatings_arimaFit,h=24)
+plot(arima_forecast)
+arima_forecast ## you can get a confidence intervals with 95%
+```
+
+```{r} 
+
+## Making HoltWinters Model
+movieRatings_holtwinters <- HoltWinters(movieRatings)
+holt_wintersForecast <- forecast(movieRatings_holtwinters)
+plot(holt_wintersForecast)
+accuracy(holt_wintersForecast)
+```
+
+
+
+
+
+
+
