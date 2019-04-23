@@ -1,0 +1,258 @@
+---
+title: "Team Enigma Descriptive"
+author: "Akshit Shah"
+date: "11/24/2018"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(stringr)
+library(tidytext)
+library(wordcloud)
+library(lattice)
+
+```
+
+```{r}
+movies=read_csv("movies.csv")
+ratings=read_csv("ratings.csv")
+```
+
+
+```{r}
+head(movies)
+```
+
+
+```{r}
+colSums(is.na(movies))
+```
+
+
+```{r}
+unique(movies$genres)
+```
+
+
+```{r}
+movies_sep <- movies %>%
+    mutate(genre=strsplit(as.character(genres), "\\|")) %>% 
+    unnest(genre) %>%
+    subset(select = -c(genres))
+```
+
+```{r}
+no_genre_listed=movies_sep[movies_sep$genres=="(no genres listed)",]
+no_genre_listed
+```
+
+
+```{r}
+summary(movies)
+```
+
+
+
+```{r}
+moviesDF <- movies %>%
+  extract(title, c("titleDummy", "year"), regex = "^(.*)\\(([0-9 \\-]*)\\)",remove=F) %>% 
+  #colSums(is.na(moviesDF)) %>%
+  mutate(title = if_else(is.na(titleDummy), title, titleDummy)) %>%
+  subset(select = -c(titleDummy)) %>%
+  mutate(genres = if_else(genres == "(no genres listed)", `is.na<-`(genres), genres))
+
+```
+
+
+
+```{r}
+moviesDF$title=trimws(moviesDF$title)
+```
+
+
+```{r}
+colSums(is.na(moviesDF))
+```
+
+```{r}
+moviesDF[is.na(moviesDF$year),]
+```
+
+
+```{r}
+nrow(moviesDF)
+
+```
+```{r}
+moviesDF=moviesDF[complete.cases(moviesDF), ]
+```
+
+
+```{r}
+nrow(moviesDF)
+```
+
+
+```{r}
+sapply(moviesDF, class)
+moviesDF$year=as.integer(moviesDF$year)
+```
+
+```{r}
+summary(moviesDF)
+```
+
+
+```{r}
+yearlyMovies <- moviesDF %>%
+  select(movieId, year) %>% # select columns we need
+  group_by(year) %>%
+  count(year) %>% # group by year
+ # count movies per year
+  arrange(year)
+
+```
+
+```{r}
+View(yearlyMovies)
+```
+
+
+```{r}
+gp <-ggplot(yearlyMovies, aes(year, n))
+gp +geom_bar(stat = "identity")
+```
+
+
+```{r}
+top_5_movies= head(arrange(yearlyMovies, desc(n)),5)
+top_5_movies
+```
+
+
+```{r}
+head(ratings)
+```
+
+```{r}
+movies_ratings_DF=merge(moviesDF,ratings,on="movieId")
+```
+
+```{r}
+head(movies_ratings_DF)
+```
+
+
+```{r}
+colSums(is.na(movies_ratings_DF))
+```
+
+```{r}
+yearlyRatings <- movies_ratings_DF %>%
+  select(movieId, year,rating) %>% 
+  group_by(year) %>% 
+  count(year)  %>% 
+  arrange(desc(n))
+```
+```{r}
+```
+
+
+```{r}
+gp <-ggplot(yearlyRatings, aes(year, n))
+gp +geom_bar(stat = "identity") 
+
+```
+
+
+
+
+
+
+```{r}
+genres <- moviesDF %>%
+  separate_rows(genres, sep = "\\|") %>%
+  group_by(genres) %>%
+  count(genres) %>%
+  arrange(desc(n))
+```
+
+
+```{r}
+mutate(genres=strsplit(as.character(genres), "\\|")) %>% 
+    unnest(genre) %>%
+    subset(select = -c(genres))
+
+```
+
+
+
+```{r}
+ggplot(data=genres, aes(x=genres, y=n)) +
+  geom_bar(stat="identity") +coord_flip()
+```
+
+
+
+```{r}
+Top_5_genre=head(arrange(genres, desc(n)),5)
+Top_5_genre
+```
+
+```{r}
+popularGenres <- moviesDF %>%
+  select(movieId, year, genres) %>% 
+  separate_rows(genres, sep = "\\|") %>% 
+  mutate(genres = as.factor(genres)) %>% 
+  group_by(year, genres) %>% 
+  summarise(number = n())
+```
+
+
+
+
+```{r}
+popularGenres
+```
+
+
+
+
+```{r}
+popularGenres %>%
+filter(genres %in% c("Drama", "Comedy", "Thriller", "Action","Romance")) %>%
+ggplot(aes(x=year, y=number)) +
+  geom_bar(stat="identity",aes(fill=genres))
+```
+
+
+
+
+```{r}
+tags=read_csv("tags.csv")
+tags$tag= str_to_lower(tags$tag)
+  
+tagsForGenre <- moviesDF %>%
+  select(movieId, year, genres) %>%
+  separate_rows(genres, sep = "\\|") %>%
+  inner_join(tags, by = "movieId") %>%
+  select(genres, tag) %>%
+  group_by(genres)
+  
+```
+
+
+
+
+
+```{r}
+genre<-"Horror"
+wordsForGenre <- tagsForGenre %>%
+  filter(genres == genre) %>%
+  count(tag)
+
+  wordcloud(wordsForGenre$tag, wordsForGenre$n, max.words = 100,min.freq = 3, colors=brewer.pal(8, "Spectral"))
+```
+
+
